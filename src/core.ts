@@ -1,43 +1,42 @@
 import { Database } from "bun:sqlite";
 
-// class Item_ {
-//   public title: string
-//   constructor(title: string) {
-//     this.title = title
-//   }
-// }
-
-const db = new Database("database.sqlite")
+const db = new Database("database.sqlite");
 
 db.run(`
   CREATE TABLE IF NOT EXISTS items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL
   )
-`)
+`);
 
-const querySelectItems = db.prepare("SELECT * FROM items")
-const queryInsertItem = db.prepare("INSERT INTO items (title) VALUES (?)")
+const querySelectItems = db.prepare("SELECT * FROM items");
+const queryInsertItem = db.prepare("INSERT INTO items (title) VALUES (?)");
+const queryDeleteItem = db.prepare("DELETE FROM items WHERE id = ?");
+const queryUpdateItem = db.prepare("UPDATE items SET title = ? WHERE id = ?");
 
-class Item {
-  constructor(public title: string) { }
+export interface Item {
+    id: number;
+    title: string;
 }
 
+export class TodoList {
 
-class TodoList {
-  private items: Item[] = []
+    getItems(): Item[] {
+        return querySelectItems.all() as Item[];
+    }
 
-  addItem(item: Item) {
-    this.items.push(item)
-    queryInsertItem.run(item.title)
-  }
+    addItem(title: string): Item {
+        const result = queryInsertItem.run(title);
+        return { id: result.lastInsertRowid as number, title };
+    }
 
-  removeItem(index: number) {
-    this.items.splice(index, 2)
-  }
+    deleteItem(id: number): boolean {
+        const result = queryDeleteItem.run(id);
+        return result.changes > 0;
+    }
 
-  getItems() {
-    const items = querySelectItems.all()
-    return items
-  }
+    updateItem(id: number, title: string): boolean {
+        const result = queryUpdateItem.run(title, id);
+        return result.changes > 0;
+    }
 }

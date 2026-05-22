@@ -1,77 +1,78 @@
-// Select DOM elements
+// Seleciona elementos do DOM
 const app = document.querySelector('#app')
 const input = app.querySelector('#task-input')
 const addButton = app.querySelector('#add-button')
 const list = app.querySelector('#list')
 const itemTemplate = list.querySelector('template')
 
-// Save tasks to local storage
-function saveToLocalStorage() {
-  const tasks = []
+const API = '/items'
 
-  list.querySelectorAll('li').forEach(li => {
-    const title = li.querySelector('.title').textContent
-    tasks.push(title)
-  })
 
-  localStorage.setItem('tasks', JSON.stringify(tasks))
+async function getItems() {
+  const res = await fetch(API)
+  return res.json()
 }
 
-// Load tasks from local storage and add them to the list
-function loadFromLocalStorage() {
-  const tasks = JSON.parse(
-    localStorage.getItem('tasks') || '[]'
-  )
+async function addItem(title) {
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  })
+  return res.json()
+}
 
-  tasks.forEach(title => {
-    const task = createDomTask(title)
-    list.appendChild(task)
+async function deleteItem(id) {
+  await fetch(`${API}/${id}`, { method: 'DELETE' })
+}
+
+async function updateItem(id, title) {
+  await fetch(`${API}/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
   })
 }
 
-// Create a DOM element for a task
-function createDomTask(title) {
+
+function createDomTask({ id, title }) {
   const task = itemTemplate.content.cloneNode(true)
+  const li = task.querySelector('li')
 
-  task.querySelector('.title').textContent = title
+  li.dataset.id = id
+  li.querySelector('.title').textContent = title
 
-  task.querySelector('.bt-delete')
-    .addEventListener('click', (e) => {
+  li.querySelector('.bt-delete').addEventListener('click', async () => {
+    await deleteItem(id)
+    li.remove()
+  })
 
-      e.target.closest('li').remove()
-
-      saveToLocalStorage()
-    })
+  li.querySelector('.title').addEventListener('dblclick', async (e) => {
+    const span = e.target
+    const newTitle = prompt('Novo título:', span.textContent)
+    if (!newTitle || newTitle.trim() === span.textContent) return
+    await updateItem(id, newTitle.trim())
+    span.textContent = newTitle.trim()
+  })
 
   return task
 }
 
-// Create a new task and add it to the list
-function createNewTask() {
+async function createNewTask() {
   const title = input.value.trim()
-
   if (!title) return
 
-  const task = createDomTask(title)
-
-  list.appendChild(task)
-
+  const item = await addItem(title)
+  list.appendChild(createDomTask(item))
   input.value = ''
-
-  saveToLocalStorage()
 }
 
-// Event listeners
-addButton.addEventListener(
-  'click',
-  createNewTask
-)
+addButton.addEventListener('click', createNewTask)
 
 input.addEventListener('keypress', (e) =>
-  (e.key === 'Enter'
-    ? createNewTask()
-    : null)
+  e.key === 'Enter' ? createNewTask() : null
 )
 
-// Load tasks from local storage on page load
-loadFromLocalStorage()
+getItems().then(items =>
+  items.forEach(item => list.appendChild(createDomTask(item)))
+)
